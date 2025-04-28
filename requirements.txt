@@ -4,3 +4,5 @@ torchvision
 numpy
 pillow
 opencv-python-headless
+streamlit-webrtc
+av

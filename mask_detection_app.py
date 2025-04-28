@@ -7,6 +7,8 @@ from torchvision import transforms
 import numpy as np
 import cv2
 
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+
 
 # --- Model Definition (unchanged) ---
 class MaskCNN(nn.Module):
@@ -47,7 +49,7 @@ def load_model():
     return model, device
 
 
-# — Sidebar —
+# — Sidebar Controls —
 st.sidebar.title("🔧 Controls")
 mode = st.sidebar.radio(
     "Input mode", ["Upload Image", "Take Photo", "Live Camera Stream"]
@@ -70,7 +72,7 @@ st.sidebar.info(
     """
 )
 
-# — Load Model & Setup —
+# — Common Setup —
 transform = transforms.Compose([transforms.Resize((128, 128)), transforms.ToTensor()])
 model, device = load_model()
 labels = ["No Mask", "Mask"]
@@ -83,7 +85,7 @@ st.markdown(
 
 input_image = None
 
-# — Static Input Modes —
+# — Static Modes —
 if mode == "Upload Image":
     uploaded = st.file_uploader("Upload a JPG/PNG image", type=["jpg", "jpeg", "png"])
     if uploaded:
@@ -94,34 +96,23 @@ elif mode == "Take Photo":
     if snap:
         input_image = Image.open(snap).convert("RGB")
 
-# — Live Stream Mode —
+# — Live Stream via WebRTC —
 elif mode == "Live Camera Stream":
-    start = st.button("▶️ Start Live Stream")
-    stop = st.button("⏹ Stop Stream")
-    placeholder = st.empty()
 
-    if start:
-        cap = cv2.VideoCapture(0)
-        while cap.isOpened() and not stop:
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to read from camera.")
-                break
-            # Preprocess & predict
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(rgb)
-            tensor = transform(img).unsqueeze(0).to(device)
+    class MaskTransformer(VideoTransformerBase):
+        def transform(self, frame):
+            img = frame.to_ndarray(format="bgr24")
+            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            tensor = transform(Image.fromarray(rgb)).unsqueeze(0).to(device)
             with torch.no_grad():
                 out = model(tensor)
                 probs = F.softmax(out, dim=1).cpu().numpy()[0]
             idx = np.argmax(probs)
             label = labels[idx]
             conf = probs[idx]
-
-            # Annotate
             color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
             cv2.putText(
-                frame,
+                img,
                 f"{label}: {conf*100:.1f}%",
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
@@ -129,13 +120,13 @@ elif mode == "Live Camera Stream":
                 color,
                 2,
             )
-            placeholder.image(
-                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
-                channels="RGB",
-                caption="Live Mask Detection",
-            )
-        cap.release()
-        placeholder.empty()
+            return img
+
+    webrtc_streamer(
+        key="mask-detect",
+        video_transformer_factory=MaskTransformer,
+        media_stream_constraints={"video": True, "audio": False},
+    )
 
 # — Run Inference on Static Image —
 if input_image is not None:
@@ -158,10 +149,6 @@ if input_image is not None:
         else:
             st.error(f"❌ {pred_label} ({pred_conf*100:.1f}%)")
 
-    # Show full probability breakdown
+    # Full probability breakdown
     with st.expander("Show class probabilities"):
         st.write({labels[0]: f"{probs[0]*100:.2f}%", labels[1]: f"{probs[1]*100:.2f}%"})
-
-
-# Run this in terminal
-# streamlit run mask_detection_app.py
