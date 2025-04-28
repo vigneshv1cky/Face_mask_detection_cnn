@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torchvision import transforms
 import numpy as np
 import cv2
-
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 
