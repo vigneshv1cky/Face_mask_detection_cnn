@@ -1,6 +1,8 @@
 
 # Mask Detection App
 
+👉 Try it live on Streamlit Cloud: [https://share.streamlit.io/?utm_source=streamlit&utm_medium=referral&utm_campaign=main&utm_content=-ss-streamlit-io-cloudpagehero](https://share.streamlit.io/?utm_source=streamlit&utm_medium=referral&utm_campaign=main&utm_content=-ss-streamlit-io-cloudpagehero)
+
 A simple Streamlit application that uses a custom CNN to detect whether a person in an image or live video stream is wearing a mask.
 
 ---
