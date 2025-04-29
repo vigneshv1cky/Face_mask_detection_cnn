@@ -50,7 +50,7 @@ A simple Streamlit application that uses a custom CNN to detect whether a person
 1. **Clone the repository**  
 
    ```bash
-   git clone https://github.com/your-username/face_mask_detection_app.git
+   git clone https://github.com/vigneshv1cky/face_mask_detection_app.git
    cd face_mask_detection_app
    ```
 
