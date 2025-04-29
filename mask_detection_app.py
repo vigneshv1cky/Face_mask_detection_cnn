@@ -99,6 +99,10 @@ elif mode == "Take Photo":
 elif mode == "Live Camera Stream":
 
     class MaskTransformer(VideoTransformerBase):
+        def __init__(self):
+            # grab the outer-scope threshold value
+            self.threshold = float(threshold)
+
         def transform(self, frame):
             img = frame.to_ndarray(format="bgr24")
             rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -109,16 +113,19 @@ elif mode == "Live Camera Stream":
             idx = np.argmax(probs)
             label = labels[idx]
             conf = probs[idx]
-            color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
-            cv2.putText(
-                img,
-                f"{label}: {conf*100:.1f}%",
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                color,
-                2,
-            )
+
+            # only draw when above threshold
+            if conf >= self.threshold:
+                color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
+                cv2.putText(
+                    img,
+                    f"{label}: {conf*100:.1f}%",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    color,
+                    2,
+                )
             return img
 
     webrtc_streamer(
