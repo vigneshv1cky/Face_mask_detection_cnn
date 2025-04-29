@@ -7,6 +7,7 @@ from torchvision import transforms
 import numpy as np
 import cv2
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import pandas as pd
 
 
 # --- Model Definition (unchanged) ---
@@ -48,6 +49,12 @@ def load_model():
     return model, device
 
 
+# Initialize session-state counters
+if "mask_count" not in st.session_state:
+    st.session_state.mask_count = 0
+if "no_mask_count" not in st.session_state:
+    st.session_state.no_mask_count = 0
+
 # — Sidebar Controls —
 st.sidebar.title("🔧 Controls")
 mode = st.sidebar.radio(
@@ -61,6 +68,8 @@ threshold = st.sidebar.slider(
     0.01,
     help="Only report a prediction if it exceeds this confidence.",
 )
+
+
 st.sidebar.markdown("---")
 st.sidebar.info(
     """
@@ -78,11 +87,18 @@ labels = ["No Mask", "Mask"]
 
 st.title("😷 Mask Detection")
 st.markdown(
-    "Check whether someone is wearing a mask.  \n"
-    "Choose an input mode from the sidebar, then run inference."
+    "Check whether someone is wearing a mask.  Choose an input mode from the sidebar, then run inference."
 )
 
 input_image = None
+
+
+def update_stats(label):
+    if label == "Mask":
+        st.session_state.mask_count += 1
+    else:
+        st.session_state.no_mask_count += 1
+
 
 # — Static Modes —
 if mode == "Upload Image":
@@ -100,7 +116,6 @@ elif mode == "Live Camera Stream":
 
     class MaskTransformer(VideoTransformerBase):
         def __init__(self):
-            # grab the outer-scope threshold value
             self.threshold = float(threshold)
 
         def transform(self, frame):
@@ -128,11 +143,13 @@ elif mode == "Live Camera Stream":
                 )
             return img
 
-    webrtc_streamer(
+    webrtc_ctx = webrtc_streamer(
         key="mask-detect",
         video_transformer_factory=MaskTransformer,
         media_stream_constraints={"video": True, "audio": False},
+        async_transform=True,
     )
+
 
 # — Run Inference on Static Image —
 if input_image is not None:
@@ -146,15 +163,24 @@ if input_image is not None:
         pred_label = labels[idx]
         pred_conf = probs[idx]
 
-    # Display results
-    if pred_conf < threshold:
-        st.warning(f"Low confidence ({pred_conf*100:.1f}%), result may be unreliable.")
+    # Display results and update stats
+    if pred_label == "Mask":
+        st.success(f"✅ {pred_label} ({pred_conf*100:.1f}%")
     else:
-        if pred_label == "Mask":
-            st.success(f"✅ {pred_label} ({pred_conf*100:.1f}%)")
-        else:
-            st.error(f"❌ {pred_label} ({pred_conf*100:.1f}%)")
+        st.error(f"❌ {pred_label} ({pred_conf*100:.1f}%)")
+    update_stats(pred_label)
 
     # Full probability breakdown
     with st.expander("Show class probabilities"):
         st.write({labels[0]: f"{probs[0]*100:.2f}%", labels[1]: f"{probs[1]*100:.2f}%"})
+
+# — Session Dashboard —
+st.markdown("---")
+st.subheader("📊 Session Stats")
+counts = {
+    "Mask": st.session_state.mask_count,
+    "No Mask": st.session_state.no_mask_count,
+}
+st.bar_chart(counts)
+df_stats = pd.DataFrame.from_dict(counts, orient="index", columns=["count"])
+st.table(df_stats)
