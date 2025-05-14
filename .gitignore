@@ -1,3 +1,8 @@
 .tmp.*
 data
 face-mask-dataset.zip
+
+*.yaml
+*.ckpt
+events.out.*
+*.csv
