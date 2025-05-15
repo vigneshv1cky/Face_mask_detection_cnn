@@ -6,3 +6,4 @@ face-mask-dataset.zip
 *.ckpt
 events.out.*
 *.csv
+*.pth
